@@ -1,0 +1,106 @@
+#### On server to be backed up:
+
+# Install Cygwin 64-bit with zip, unzip, lzip, rsync, vim, and openssh server (for pulling with backup server)
+
+# Powershell 3.0+:
+Invoke-WebRequest -Outfile cygwin_setup-x86_64.exe https://www.cygwin.com/setup-x86_64.exe
+.\cygwin_setup-x86_64.exe --no-shortcuts --quiet-mode --disable-buggy-antivirus --packages zip unzip lzip rsync openssh
+
+# Open Cygwin (run as admin)
+$ ssh-host-config
+# Should StrictModes be used? no :(
+# New local account 'sshd'? yes
+# Install sshd as a service? yes
+# Enter value of CYGWIN for daemon: binmode ntsec
+# Do you want to use a different name? no
+# Create new privileged user? yes
+# Please enter the password: *******
+
+# Finished! Close admin Cygwin.
+# If you want to verify check "Services" for CYGWIN SSHd and Users for cyg_server and sshd
+
+# Add rule to windows firewall for SSH port 22
+# Create user for backups with limited (read only permissions if possible, and admin) in AD or SBS console to match following:
+# Alliance and Alliback (or whatever you want but keep same for simplicity imo)
+# Win Server 2012: Add users to Backup Operators or Admin group to allow local login (required for ssh access)
+
+# Make /etc/passwd file so user can login:
+$ /bin/mkpasswd -l -u alliance >> /etc/passwd
+$ /bin/mkpasswd -l -u alliback >> /etc/passwd
+# verify with:
+$ cat /etc/passwd
+
+# Start SSH service:
+open cmd> net start "CYGWIN sshd"
+
+# Port forward SSH and test login port 22
+
+# ----- DONE SSH SETUP ------
+
+
+# Generate private & public keys
+
+ON QNAP:
+
+# install Entware-ng on QNAP/Syology
+https://github.com/Entware/Entware/wiki/Install-on-QNAP-NAS
+
+# install rsync & rsnapshot
+opkg update && opkg install rsync rsnapshot vim curl ca-certificates screen
+
+# generate public/private keypair
+mkdir -p /root/.ssh && cd /root/.ssh && ssh-keygen -f id_rsa -t rsa -N ''
+scp id_rsa.pub alliback@$SERVER_IP:/home/alliback/authorized_keys
+ssh alliback@$SERVER_IP 'mkdir -p /home/alliback/.ssh/ && mv /home/alliback/authorized_keys /home/alliback/.ssh/ && chmod 0711 /home/alliback/ && chmod 0700 /home/alliback/.ssh && chmod 0600 /home/alliback/.ssh/authorized_keys'
+
+mkdir -p /share/CACHEDEV1_DATA/Backup/log/
+touch /share/CACHEDEV1_DATA/Backup/log/rsnapshot.log 
+touch /share/CACHEDEV1_DATA/Backup/log/backup.log
+chown -R admin:administrators /share/CACHEDEV1_DATA/Backup
+chmod ug+rw -R /share/CACHEDEV1_DATA/Backup
+
+Copy alliback folder to server then move to NAS
+# Keenans way: scp -r /cygdrive/e/Users/Admin/Desktop/alco-nas-back alliback@remoteip:/share/CACHEDEV1_DATA/Public/
+
+# test. this should log you in without pass:
+ssh alliback@$SERVER_IP -i id_rsa
+
+[/] # ls /share/CACHEDEV1_DATA/Public/
+@Recycle/ alco-nas-back/
+
+
+cd /share/CACHEDEV1_DATA/Public/alco-nas-back
+cp /opt/etc/rsnapshot.conf /opt/etc/rsnapshot.conf.bak
+cp rsnapshot.conf /opt/etc/rsnapshot.conf
+
+
+cp -R /share/CACHEDEV1_DATA/Public/alco-nas-back /root/
+touch /root/backup.log
+cd /root/alco-nas-back
+
+rsnapshot configtest
+
+chmod +x rsnapshot-wrapper.sh
+
+
+
+
+
+# crontab
+# rsnapshot daily, hourly, weekly snapshots
+
+0 9-17 * * * root /root/alco-nas-back/rsnapshot-wrapper.sh hourly
+30 2 * * * root /root/alco-nas-back/rsnapshot-wrapper.sh daily
+30 10 * * 6 root /root/alco-nas-back/rsnapshot-wrapper.sh weekly
+30 14 1 * * root /root/alco-nas-back/rsnapshot-wrapper.sh monthly
+
+
+
+# IF NECESSARY ONLY
+#  Create new Group Policy 
+#  Computer Configuration\Windows Settings\Security Settings\Local Policies\User Rights Assignment
+#  Assign these to cyg_server user:
+#  Act as part of the operating system (SeTcbPrivilege)
+#  Create a token object               (SeCreateTokenPrivilege)
+#  Replace a process level token       (SeAssignPrimaryTokenPrivilege)
+# run gpupdate

@@ -1,0 +1,48 @@
+
+
+# Work in Progress
+/sbin/getsysinfo model
+
+# TS-201
+mount -t ext2 /dev/mtdblock4 /tmp/config
+vi /tmp/config/autorun.sh
+chmod +x /tmp/config/autorun.sh
+echo .
+echo "unmounting /tmp/config..."
+umount /tmp/config
+
+
+# For TS-109, TS-109P, TS-119, TS-209, TS-209P, TS-219, TS-412, TS-409 (Marvell ARM) use ... 
+mount -t ext2 /dev/mtdblock5 /tmp/config
+vi /tmp/config/autorun.sh
+chmod +x /tmp/config/autorun.sh
+echo .
+echo "unmounting /tmp/config..."
+umount /tmp/config
+
+#HAL-BASED INTEL/AMD NAS:
+mount $(/sbin/hal_app --get_boot_pd port_id=0)6 /tmp/config
+touch /tmp/config/autorun.sh
+chmod +x /tmp/config/autorun.sh
+$EDITOR /tmp/config/autorun.sh
+umount /tmp/config
+
+# TAS-x68, TS-x28 use ... 
+/bin/mount -t ext4 /dev/mmcblk0p7 /tmp/config
+vi /tmp/config/autorun.sh
+chmod +x /tmp/config/autorun.sh
+echo .
+echo "unmounting /tmp/config..."
+umount /tmp/config
+
+# All AL-based NAS(TS-x31+ and TS-x31X) and TS-x31 use ... 
+ubiattach -m 6 -d 2
+/bin/mount -t ubifs ubi2:config /tmp/config
+vi /tmp/config/autorun.sh
+chmod +x /tmp/config/autorun.sh
+echo .
+echo "unmounting /tmp/config..."
+umount /tmp/config
+ubidetach -m 6
+
+
